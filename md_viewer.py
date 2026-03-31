@@ -218,7 +218,8 @@ class Handler(BaseHTTPRequestHandler):
   }}
   .rendered table {{
     border-collapse: collapse;
-    width: 100%;
+    width: auto;
+    min-width: 100%;
     margin: 1em 0;
   }}
   .rendered th, .rendered td {{
@@ -255,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    max-width: 1600px;
+    max-width: 100%;
   }}
 
   .container.split-mode .rendered {{
@@ -393,8 +394,27 @@ class Handler(BaseHTTPRequestHandler):
     mermaid.run();
   }}
 
+  // Expand container width when tables are wider than the default 900px
+  function adjustContainerWidth() {{
+    const container = document.querySelector('.container');
+    // Split mode uses full viewport width via CSS — skip JS override
+    if (container.classList.contains('split-mode')) {{
+      container.style.maxWidth = '';
+      return;
+    }}
+    const tables = rendered.querySelectorAll('table');
+    let maxTableWidth = 0;
+    tables.forEach(function(t) {{
+      if (t.scrollWidth > maxTableWidth) maxTableWidth = t.scrollWidth;
+    }});
+    // 128px = card padding (40*2) + container padding (24*2)
+    const needed = maxTableWidth + 128;
+    container.style.maxWidth = (needed > 900 ? needed + 'px' : '');
+  }}
+
   rendered.innerHTML = marked.parse(rawMd);
   renderMermaid();
+  adjustContainerWidth();
 
   // Handle anchor links — scroll within the page instead of requesting the server
   rendered.addEventListener('click', function(e) {{
@@ -427,6 +447,7 @@ class Handler(BaseHTTPRequestHandler):
       splitTimer = setTimeout(function() {{
         rendered.innerHTML = marked.parse(cm.getValue());
         renderMermaid();
+        adjustContainerWidth();
       }}, 300);
     }}
   }});
@@ -443,6 +464,7 @@ class Handler(BaseHTTPRequestHandler):
     btnView.classList.add('active');
     btnEdit.classList.remove('active');
     btnSplit.classList.remove('active');
+    adjustContainerWidth();
   }}
 
   function showEdit() {{
@@ -466,6 +488,7 @@ class Handler(BaseHTTPRequestHandler):
     btnSplit.classList.add('active');
     btnView.classList.remove('active');
     btnEdit.classList.remove('active');
+    adjustContainerWidth();
     setTimeout(function() {{ cm.refresh(); cm.focus(); }}, 10);
   }}
 
