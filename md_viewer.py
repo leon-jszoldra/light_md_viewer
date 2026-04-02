@@ -12,7 +12,8 @@ import html
 import webbrowser
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote
+import mimetypes
 
 # Globals set in main()
 MD_PATH = ""
@@ -30,7 +31,25 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/content":
             self._serve_content()
         else:
+            self._serve_static()
+
+    def _serve_static(self):
+        """Serve files relative to the markdown file's directory (for images etc.)."""
+        rel_path = unquote(self.path.lstrip("/"))
+        base_dir = os.path.realpath(os.path.dirname(MD_PATH))
+        file_path = os.path.realpath(os.path.join(base_dir, rel_path))
+        if not file_path.startswith(base_dir + os.sep):
+            self.send_error(403)
+            return
+        if not os.path.isfile(file_path):
             self.send_error(404)
+            return
+        content_type, _ = mimetypes.guess_type(file_path)
+        self.send_response(200)
+        self.send_header("Content-Type", content_type or "application/octet-stream")
+        self.end_headers()
+        with open(file_path, "rb") as f:
+            self.wfile.write(f.read())
 
     def do_POST(self):
         if self.path == "/save":
