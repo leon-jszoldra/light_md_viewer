@@ -1,4 +1,4 @@
-# Light MD Viewer
+# <img src="linux/md-viewer.png" width="36" height="36"> Light MD Viewer
 
 A single-file Markdown viewer and editor. Double-click a `.md` file and it opens rendered in your browser - with a built-in editor, live preview, and save-back-to-disk support. No dependencies beyond Python 3.
 
