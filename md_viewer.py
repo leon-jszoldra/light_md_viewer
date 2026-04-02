@@ -545,6 +545,11 @@ class Handler(BaseHTTPRequestHandler):
       e.returnValue = '';
     }}
   }});
+
+  // Shut down the server when the tab is closed
+  window.addEventListener('pagehide', function() {{
+    navigator.sendBeacon('/shutdown');
+  }});
 </script>
 </body>
 </html>"""
