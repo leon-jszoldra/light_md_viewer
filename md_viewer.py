@@ -9,6 +9,7 @@ import sys
 import os
 import json
 import html
+import secrets
 import webbrowser
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -19,6 +20,7 @@ import mimetypes
 MD_PATH = ""
 HOST = "127.0.0.1"
 PORT = 0  # auto-assigned
+MAX_SAVE_SIZE = 10 * 1024 * 1024  # 10 MB limit for POST /save
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -72,6 +74,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _handle_save(self):
         length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_SAVE_SIZE:
+            self.send_response(413)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "File too large"}).encode("utf-8"))
+            return
         body = self.rfile.read(length)
         data = json.loads(body)
         content = data.get("content", "")
@@ -83,10 +91,11 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"ok": True}).encode("utf-8"))
         except Exception as e:
+            print(f"Save error: {e}", file=sys.stderr)
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            self.wfile.write(json.dumps({"error": "Failed to save file"}).encode("utf-8"))
 
     def _serve_page(self):
         with open(MD_PATH, "r", encoding="utf-8", errors="replace") as f:
@@ -95,15 +104,17 @@ class Handler(BaseHTTPRequestHandler):
         filename = os.path.basename(MD_PATH)
         folder = os.path.dirname(MD_PATH)
         md_json = json.dumps(raw_md)
+        nonce = secrets.token_urlsafe(32)
 
         page = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{nonce}' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self'; font-src https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'">
 <title>{html.escape(filename)}</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous">
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 
@@ -321,10 +332,10 @@ class Handler(BaseHTTPRequestHandler):
 <div class="toolbar">
   <div class="filename">{html.escape(filename)}</div>
   <div class="path" title="{html.escape(folder)}">{html.escape(folder)}</div>
-  <button id="btnView" class="active" onclick="showView()">View</button>
-  <button id="btnEdit" onclick="showEdit()">Edit</button>
-  <button id="btnSplit" onclick="showSplit()">Split</button>
-  <button id="btnSave" class="save-btn" onclick="saveFile()">Save</button>
+  <button id="btnView" class="active">View</button>
+  <button id="btnEdit">Edit</button>
+  <button id="btnSplit">Split</button>
+  <button id="btnSave" class="save-btn">Save</button>
   <span id="saveStatus" class="save-status"></span>
 </div>
 
@@ -335,16 +346,17 @@ class Handler(BaseHTTPRequestHandler):
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/markdown/markdown.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/mode/overlay.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/gfm/gfm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/continuelist.min.js"></script>
-<script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js" integrity="sha384-3zf4Pen4fXU90jGg3cxmo7BF4dq8HMtF2s07c/Hhd1Fh+Encm6ApPvNm8vrMJbWu" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js" integrity="sha384-BEgQlz0fN4eG0n4jipmUe+nOg65hPY7L0E/lPVRaOPdzAfLPGEbXnpAodHtSnlwM" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/markdown/markdown.min.js" integrity="sha384-nPWqI+4+e+SwcpI6LVYBpaQd+zIZIQgC6lN7Gep8MJQr5DdmMGtWV8qJQgcyODcF" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js" integrity="sha384-xPpkMo5nDgD98fIcuRVYhxkZV6/9Y4L8s3p0J5c4MxgJkyKJ8BJr+xfRkq7kn6Tw" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/mode/overlay.min.js" integrity="sha384-g9ZAntHz8wq4eO03zXothSSZmCViVkPXhen5AaLIH4KaZVkjce0ME/TXTpRgsyDh" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/gfm/gfm.min.js" integrity="sha384-owcyd1tfdpiSNWJdvXDH+GRNcgrtWravOMajtO0Gejjw8s+TUJA0I8obL3l3kYbu" crossorigin="anonymous"></script>
+<script nonce="{nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/continuelist.min.js" integrity="sha384-ew54Ry5+wy74QeO2dHPrrhU+KDKvd1D6yOI2/K31tuA7IuzhvUpPqDNbqSR1UEWM" crossorigin="anonymous"></script>
+<script nonce="{nonce}">
   const rawMd = {md_json};
   let savedContent = rawMd;
   let dirty = false;
@@ -360,11 +372,12 @@ class Handler(BaseHTTPRequestHandler):
     gfm: true
   }});
 
-  // Add id attributes to headings for anchor navigation
+  // Add id attributes to headings and safety attributes to external links
   marked.use({{
     hooks: {{
       postprocess: function(html) {{
-        return html.replace(/<h([1-6])>(.*?)<\/h[1-6]>/g, function(match, level, content) {{
+        // Add anchor IDs to headings
+        html = html.replace(/<h([1-6])>(.*?)<\/h[1-6]>/g, function(match, level, content) {{
           const slug = content.replace(/<[^>]*>/g, '').toLowerCase()
             .replace(/[^\w\s-]/g, '')
             .replace(/\s+/g, '-')
@@ -372,9 +385,34 @@ class Handler(BaseHTTPRequestHandler):
             .trim();
           return '<h' + level + ' id="' + slug + '">' + content + '</h' + level + '>';
         }});
+        // Add target/rel to external links
+        html = html.replace(/<a href="(.*?)"/g, function(match, href) {{
+          if (href && !href.startsWith('#') && !href.startsWith('/')) {{
+            return match + ' target="_blank" rel="noopener noreferrer"';
+          }}
+          return match;
+        }});
+        return html;
       }}
     }}
   }});
+
+  // DOMPurify configuration - allowlist of safe tags and attributes
+  const PURIFY_CONFIG = {{
+    ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','p','br','hr','ul','ol','li',
+      'blockquote','pre','code','em','strong','del','s','a','img','table','thead',
+      'tbody','tr','th','td','div','span','sup','sub','details','summary',
+      'input','dl','dt','dd','abbr','mark','ins','kbd','var','samp','small',
+      'figure','figcaption'],
+    ALLOWED_ATTR: ['href','src','alt','title','class','id','target','rel',
+      'width','height','align','checked','disabled','type','start','colspan',
+      'rowspan','name'],
+    ALLOW_DATA_ATTR: false
+  }};
+
+  function safeRender(md) {{
+    return DOMPurify.sanitize(marked.parse(md), PURIFY_CONFIG);
+  }}
 
   const rendered = document.getElementById('rendered');
   const rawView = document.getElementById('rawView');
@@ -383,6 +421,14 @@ class Handler(BaseHTTPRequestHandler):
   const btnSave = document.getElementById('btnSave');
   const btnSplit = document.getElementById('btnSplit');
   const saveStatus = document.getElementById('saveStatus');
+
+  let mode = 'view';
+
+  // Attach button handlers (no inline onclick — blocked by CSP)
+  btnView.addEventListener('click', function() {{ showView(); }});
+  btnEdit.addEventListener('click', function() {{ showEdit(); }});
+  btnSplit.addEventListener('click', function() {{ showSplit(); }});
+  btnSave.addEventListener('click', function() {{ saveFile(); }});
 
   // Initialize CodeMirror
   const cm = CodeMirror(document.getElementById('editorHost'), {{
@@ -400,10 +446,14 @@ class Handler(BaseHTTPRequestHandler):
     }}
   }});
 
-  mermaid.initialize({{ startOnLoad: false, theme: 'default' }});
+  mermaid.initialize({{ startOnLoad: false, theme: 'default', securityLevel: 'strict', maxEdges: 500 }});
 
   function renderMermaid() {{
-    document.querySelectorAll('pre code.language-mermaid').forEach(function(block) {{
+    const blocks = document.querySelectorAll('pre code.language-mermaid');
+    const MAX_DIAGRAMS = 20;
+    let count = 0;
+    blocks.forEach(function(block) {{
+      if (count++ >= MAX_DIAGRAMS) return;
       const pre = block.parentElement;
       const div = document.createElement('div');
       div.className = 'mermaid';
@@ -431,7 +481,7 @@ class Handler(BaseHTTPRequestHandler):
     container.style.maxWidth = (needed > 900 ? needed + 'px' : '');
   }}
 
-  rendered.innerHTML = marked.parse(rawMd);
+  rendered.innerHTML = safeRender(rawMd);
   renderMermaid();
   adjustContainerWidth();
 
@@ -464,18 +514,16 @@ class Handler(BaseHTTPRequestHandler):
     if (mode === 'split') {{
       clearTimeout(splitTimer);
       splitTimer = setTimeout(function() {{
-        rendered.innerHTML = marked.parse(cm.getValue());
+        rendered.innerHTML = safeRender(cm.getValue());
         renderMermaid();
         adjustContainerWidth();
       }}, 300);
     }}
   }});
 
-  let mode = 'view';
-
   function showView() {{
     mode = 'view';
-    rendered.innerHTML = marked.parse(cm.getValue());
+    rendered.innerHTML = safeRender(cm.getValue());
     renderMermaid();
     rendered.style.display = 'block';
     rawView.style.display = 'none';
@@ -499,7 +547,7 @@ class Handler(BaseHTTPRequestHandler):
 
   function showSplit() {{
     mode = 'split';
-    rendered.innerHTML = marked.parse(cm.getValue());
+    rendered.innerHTML = safeRender(cm.getValue());
     renderMermaid();
     rendered.style.display = 'block';
     rawView.style.display = 'block';
@@ -554,8 +602,21 @@ class Handler(BaseHTTPRequestHandler):
 </body>
 </html>"""
 
+        csp = (
+            f"default-src 'none'; "
+            f"script-src 'nonce-{nonce}' https://cdnjs.cloudflare.com; "
+            f"style-src 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            f"img-src 'self' data:; "
+            f"connect-src 'self'; "
+            f"font-src https://cdnjs.cloudflare.com; "
+            f"base-uri 'none'; "
+            f"form-action 'none'"
+        )
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Security-Policy", csp)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
         self.end_headers()
         self.wfile.write(page.encode("utf-8"))
 

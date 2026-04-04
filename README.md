@@ -18,6 +18,10 @@ A single-file Markdown viewer and editor. Opens `.md` files rendered in your bro
 - Unsaved-changes warning before closing
 - CodeMirror editor with GFM support
 
+## Security
+
+All rendered HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify) using a tag allowlist, preventing XSS from malicious markdown files. CDN scripts are integrity-checked (SRI) and the page enforces a nonce-based Content Security Policy that blocks injected scripts.
+
 ## Quick start
 
 ```
