@@ -103,7 +103,9 @@ class Handler(BaseHTTPRequestHandler):
 
         filename = os.path.basename(MD_PATH)
         folder = os.path.dirname(MD_PATH)
-        md_json = json.dumps(raw_md)
+        # Escape </ sequences so </script> in markdown content doesn't
+        # break the HTML parser when embedded inside a <script> tag
+        md_json = json.dumps(raw_md).replace("</", r"<\/")
         filename_json = json.dumps(filename)
         nonce = secrets.token_urlsafe(32)
 
@@ -112,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{nonce}' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; font-src https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{nonce}' https://cdnjs.cloudflare.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self'; font-src https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'">
 <title>{html.escape(filename)}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous">
@@ -623,12 +625,6 @@ class Handler(BaseHTTPRequestHandler):
   }}
 
   marked.setOptions({{
-    highlight: function(code, lang) {{
-      if (lang && hljs.getLanguage(lang)) {{
-        return hljs.highlight(code, {{ language: lang }}).value;
-      }}
-      return hljs.highlightAuto(code).value;
-    }},
     breaks: true,
     gfm: true
   }});
@@ -697,6 +693,15 @@ class Handler(BaseHTTPRequestHandler):
 
   mermaid.initialize({{ startOnLoad: false, theme: isDark ? 'dark' : 'default', themeVariables: isDark ? {{ primaryTextColor: '#ffffff', lineColor: '#a0a0a0', edgeLabelBackground: '#2d2d2d', clusterBkg: '#333', clusterBorder: '#666', titleColor: '#d4d4d4' }} : {{}}, securityLevel: 'strict', maxEdges: 500 }});
 
+  // Apply syntax highlighting to code blocks after markdown rendering
+  function highlightCode() {{
+    rendered.querySelectorAll('pre code').forEach(function(block) {{
+      if (!block.classList.contains('language-mermaid')) {{
+        hljs.highlightElement(block);
+      }}
+    }});
+  }}
+
   function renderMermaid() {{
     var blocks = document.querySelectorAll('pre code.language-mermaid');
     var MAX_DIAGRAMS = 20;
@@ -729,6 +734,7 @@ class Handler(BaseHTTPRequestHandler):
   }}
 
   rendered.innerHTML = safeRender(rawMd);
+  highlightCode();
   renderMermaid();
   adjustContainerWidth();
 
@@ -785,6 +791,7 @@ class Handler(BaseHTTPRequestHandler):
       clearTimeout(splitTimer);
       splitTimer = setTimeout(function() {{
         rendered.innerHTML = safeRender(cm.getValue());
+        highlightCode();
         renderMermaid();
         adjustContainerWidth();
       }}, 300);
@@ -794,6 +801,7 @@ class Handler(BaseHTTPRequestHandler):
   function showView() {{
     mode = 'view';
     rendered.innerHTML = safeRender(cm.getValue());
+    highlightCode();
     renderMermaid();
     rendered.style.display = 'block';
     rawView.style.display = 'none';
@@ -818,6 +826,7 @@ class Handler(BaseHTTPRequestHandler):
   function showSplit() {{
     mode = 'split';
     rendered.innerHTML = safeRender(cm.getValue());
+    highlightCode();
     renderMermaid();
     rendered.style.display = 'block';
     rawView.style.display = 'block';
@@ -905,6 +914,7 @@ class Handler(BaseHTTPRequestHandler):
     mermaid.initialize({{ startOnLoad: false, theme: dark ? 'dark' : 'default', themeVariables: dark ? {{ primaryTextColor: '#ffffff', lineColor: '#a0a0a0', edgeLabelBackground: '#2d2d2d', clusterBkg: '#333', clusterBorder: '#666', titleColor: '#d4d4d4' }} : {{}}, securityLevel: 'strict', maxEdges: 500 }});
     if (mode === 'view' || mode === 'split') {{
       rendered.innerHTML = safeRender(cm.getValue());
+      highlightCode();
       renderMermaid();
     }}
   }}
@@ -952,7 +962,7 @@ class Handler(BaseHTTPRequestHandler):
             f"default-src 'none'; "
             f"script-src 'nonce-{nonce}' https://cdnjs.cloudflare.com; "
             f"style-src 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            f"img-src 'self' data: blob:; "
+            f"img-src 'self' data: blob: https:; "
             f"connect-src 'self'; "
             f"font-src https://cdnjs.cloudflare.com; "
             f"base-uri 'none'; "

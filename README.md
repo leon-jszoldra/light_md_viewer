@@ -20,7 +20,7 @@ A single-file Markdown viewer and editor. Opens `.md` files rendered in your bro
 
 ## Security
 
-All rendered HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify) using a tag allowlist, preventing XSS from malicious markdown files. CDN scripts are integrity-checked (SRI) and the page enforces a nonce-based Content Security Policy that blocks injected scripts.
+All rendered HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify) using a tag allowlist, preventing XSS from malicious markdown files. CDN scripts are integrity-checked (SRI) and the page enforces a nonce-based Content Security Policy that blocks injected scripts. Images from HTTPS URLs are allowed by the CSP so that markdown files referencing external images render correctly.
 
 ## Quick start
 
