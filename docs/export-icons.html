@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head><title>Export Icons - Light MD Viewer (Standalone)</title></head>
+<body style="font-family:sans-serif;padding:2em;">
+<h2>Icon Export - Standalone Viewer (Inverted)</h2>
+<p>Click each button to download the PNG. Replace the files in win/ and linux/ folders.<br>
+For Windows .ico, use an online converter (e.g. convertico.com) with the 256x256 PNG.</p>
+<div id="previews" style="display:flex;gap:24px;align-items:end;margin:24px 0;flex-wrap:wrap;"></div>
+<script>
+var svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="4" y="4" width="120" height="120" rx="20" ry="20" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1"/>
+  <clipPath id="rightCorner">
+    <rect x="4" y="4" width="120" height="120" rx="20" ry="20"/>
+  </clipPath>
+  <rect x="64" y="4" width="60" height="120" fill="#ffffff" clip-path="url(#rightCorner)"/>
+  <text x="34" y="84" font-family="'Georgia','Times New Roman','Palatino',serif" font-size="68" font-weight="400" font-style="italic" fill="#d4d4d4" text-anchor="middle" dominant-baseline="auto">m</text>
+  <g transform="translate(76, 36)" fill="#1976d2">
+    <rect x="28" y="0" width="8" height="52"/>
+    <rect x="0" y="16" width="24" height="8" rx="2"/>
+    <rect x="0" y="44" width="24" height="8" rx="2"/>
+    <rect x="0" y="28" width="8" height="24" rx="2"/>
+  </g>
+</svg>`;
+
+var sizes = [16, 48, 128, 256];
+var container = document.getElementById('previews');
+
+sizes.forEach(function(size) {
+  var div = document.createElement('div');
+  div.style.textAlign = 'center';
+
+  var canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.border = '1px solid #ccc';
+  canvas.style.borderRadius = '4px';
+
+  var img = new Image();
+  var blob = new Blob([svg], {type: 'image/svg+xml;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+
+  img.onload = function() {
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+    URL.revokeObjectURL(url);
+
+    var name = size === 256 ? 'md-viewer.png' : 'icon' + size + '.png';
+    var btn = document.createElement('button');
+    btn.textContent = 'Download ' + name;
+    btn.style.cssText = 'display:block;margin:8px auto 0;padding:6px 12px;cursor:pointer;';
+    btn.onclick = function() {
+      var a = document.createElement('a');
+      a.download = name;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
+    div.appendChild(btn);
+  };
+  img.src = url;
+
+  var label = document.createElement('div');
+  label.textContent = size + 'x' + size;
+  label.style.cssText = 'font-size:13px;color:#666;margin-bottom:4px;';
+
+  div.appendChild(label);
+  div.appendChild(canvas);
+  container.appendChild(div);
+});
+</script>
+</body>
+</html>
