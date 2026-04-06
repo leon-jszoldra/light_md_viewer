@@ -2,7 +2,7 @@
 
 A single-file Markdown viewer and editor. Opens `.md` files rendered in your browser - with a built-in editor, live preview, and save-back-to-disk support. No dependencies beyond Python 3.
 
-![screenshot](docs/screenshot.png)
+
 
 ## How it works
 
