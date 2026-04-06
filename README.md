@@ -32,10 +32,10 @@ python md_viewer.py path/to/file.md
 
 To double-click `.md` files and have them open in MD Viewer:
 
-| Platform | Script | Requires admin |
-|----------|--------|----------------|
-| Windows  | `win\setup_windows.bat` | No |
-| Linux    | `linux/setup_linux.sh`  | No |
+| Platform | Script |
+|----------|--------|
+| Windows  | `win\setup_windows.bat` |
+| Linux    | `linux/setup_linux.sh`  |
 
 Both scripts register MD Viewer for the current user only and can be re-run safely.
 
